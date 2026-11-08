@@ -528,14 +528,14 @@ async def downloadAssets(base, base_page_text):
                 assets.append(file)
 
         else:
-            if "vendors-react" in js:
+            if "vendors-react" in js or "vendors-common" in js:  # showcase 26.x renamed vendors-react -> vendors-common
                 react_vendor_filename = file
             assets.append(file)
 
     if showcase_runtime_filename is None:
         raise Exception("In all js files found on the page could not find any that have showcase and runtime in the filename for the showcase runtime js file")
     if react_vendor_filename is None:
-        raise Exception("In all js files found on the page could not find any that have vendors-react in the filename for the react vendor js file")
+        logging.warning("No react vendor js file (vendors-react/vendors-common) found on the page; skipping the react src-reset patch")
     await downloadFile("STATIC_ASSET", True, "https://matterport.com/nextjs-assets/images/favicon.ico", "favicon.ico")  # mainly to avoid the 404, always matterport.com
     showcase_cont = await downloadFileAndGetText(typeDict[showcase_runtime_filename], True, base + showcase_runtime_filename, showcase_runtime_filename, always_download=CLA.getCommandLineArg(CommandLineArg.REFRESH_KEY_FILES))
 
