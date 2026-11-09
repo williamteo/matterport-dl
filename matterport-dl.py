@@ -1476,9 +1476,38 @@ MAX_TASKS_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 RUN_ARGS_CONFIG_NAME = "run_args.json"
 
 
+def loadSessionCookies() -> dict[str, str]:
+    """Parse a browser Cookie header line into a name/value dict.
+
+    Used for models that are not shared publicly, where the showcase page and the
+    graph API only answer an authenticated session. The file holds live session
+    credentials, so the path is never saved into run_args.json and the values are
+    never logged.
+    """
+    cookie_file = CLA.getCommandLineArg(CommandLineArg.COOKIE_FILE)
+    if not cookie_file:
+        return {}
+
+    path = pathlib.Path(cookie_file).expanduser()
+    if not path.is_file():
+        raise Exception(f"Cookie file not found: {path}")
+
+    cookies: dict[str, str] = {}
+    for pair in path.read_text(encoding="UTF-8").strip().split(";"):
+        name, separator, value = pair.strip().partition("=")
+        if separator and name:
+            cookies[name] = value
+
+    if not cookies:
+        raise Exception(f"No cookies parsed from {path}, expected a 'name=value; name2=value2' line")
+
+    logging.info(f"Loaded {len(cookies)} session cookies from {path.name}")
+    return cookies
+
+
 def SetupSession(use_proxy):
     global OUR_SESSION, MAX_CONCURRENT_REQUESTS, BASE_MATTERPORT_DOMAIN
-    OUR_SESSION = requests.AsyncSession(impersonate="chrome", max_clients=MAX_CONCURRENT_REQUESTS, verify=CLA.getCommandLineArg(CommandLineArg.VERIFY_SSL), proxies=({"http": use_proxy, "https": use_proxy} if use_proxy else None), headers={"Referer": f"https://my.{BASE_MATTERPORT_DOMAIN}/", "x-matterport-application-name": "showcase"})
+    OUR_SESSION = requests.AsyncSession(impersonate="chrome", cookies=loadSessionCookies(), max_clients=MAX_CONCURRENT_REQUESTS, verify=CLA.getCommandLineArg(CommandLineArg.VERIFY_SSL), proxies=({"http": use_proxy, "https": use_proxy} if use_proxy else None), headers={"Referer": f"https://my.{BASE_MATTERPORT_DOMAIN}/", "x-matterport-application-name": "showcase"})
 
 
 def RegisterWindowsBrowsers():
@@ -1657,7 +1686,7 @@ class KeyHandler:
         return url.replace(match.group(0), key_val)
 
 
-CommandLineArg = Enum("CommandLineArg", ["ADVANCED_DOWNLOAD", "PROXY", "VERIFY_SSL", "DEBUG", "CONSOLE_LOG", "TILDE", "BASE_FOLDER", "ALIAS", "DOWNLOAD", "MAIN_ASSET_DOWNLOAD", "MANUAL_HOST_REPLACEMENT", "ALWAYS_DOWNLOAD_GRAPH_REQS", "QUIET", "HELP", "ADV_HELP", "AUTO_SERVE", "FIND_URL_KEY", "FIND_URL_KEY_AND_DOWNLOAD", "REFRESH_KEY_FILES", "GENERATE_TILE_MESH_CROPS", "TITLE"])
+CommandLineArg = Enum("CommandLineArg", ["ADVANCED_DOWNLOAD", "PROXY", "VERIFY_SSL", "DEBUG", "CONSOLE_LOG", "TILDE", "BASE_FOLDER", "ALIAS", "DOWNLOAD", "MAIN_ASSET_DOWNLOAD", "MANUAL_HOST_REPLACEMENT", "ALWAYS_DOWNLOAD_GRAPH_REQS", "QUIET", "HELP", "ADV_HELP", "AUTO_SERVE", "FIND_URL_KEY", "FIND_URL_KEY_AND_DOWNLOAD", "REFRESH_KEY_FILES", "GENERATE_TILE_MESH_CROPS", "TITLE", "COOKIE_FILE"])
 ArgAppliesTo = Enum("ArgAppliesTo", ["DOWNLOAD", "SERVING", "BOTH"])
 
 
@@ -1793,6 +1822,7 @@ def main():
     CLA.addCommandLineArg(CommandLineArg.REFRESH_KEY_FILES, "There are about a half dozen files always downloaded as they may contain access keys we need, this prevents these from downloading", True, hidden=True, allow_saved=False)
     CLA.addCommandLineArg(CommandLineArg.GENERATE_TILE_MESH_CROPS, "Certain views like dollhouse require cropped versions of certain textures, this uses python to generate all those", True, hidden=False, allow_saved=True)
 
+    CLA.addCommandLineArg(CommandLineArg.COOKIE_FILE, "file holding a browser Cookie header line for your logged in matterport session, needed for models that are not shared publicly", "", itemValueHelpDisplay="path", allow_saved=False)
     CLA.addCommandLineArg(CommandLineArg.MANUAL_HOST_REPLACEMENT, "Use old style replacement of matterport URLs rather than the JS proxy, this likely only works if hosted on port 8080 after", False, hidden=True)
 
     CLA.addCommandLineArg(CommandLineArg.QUIET, "Only show failure log message items when serving", False, applies_to=ArgAppliesTo.SERVING, allow_saved=False)
