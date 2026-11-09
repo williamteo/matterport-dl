@@ -32,7 +32,7 @@ from functools import partial
 from tqdm import tqdm as std_tqdm
 
 tqdm = partial(std_tqdm, smoothing=0.1)
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import decimal
 import signal
 
@@ -1575,7 +1575,11 @@ def startServer(baseDir, pageId, browserLaunch, bindAddress, bindPort):
     logging.info(f"Server starting up {sys_info()}")
     SERVED_BASE_URL = url = f"http://{bindAddress}:{bindPort}"
     print("View in browser: " + url)
-    httpd = HTTPServer((bindAddress, bindPort), OurSimpleHTTPRequestHandler)
+    # Threaded: a single threaded server serialises every request, so one slow
+    # read stalls the accept loop and the browser's parallel connections are
+    # refused outright. Harmless on local disk, fatal when the archive lives on
+    # network storage, where reads run orders of magnitude slower.
+    httpd = ThreadingHTTPServer((bindAddress, bindPort), OurSimpleHTTPRequestHandler)
     if browserLaunch:
         print(f"Going to try and launch browser type: {browserLaunch}")
         import webbrowser
