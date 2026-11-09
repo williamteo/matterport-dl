@@ -1427,6 +1427,15 @@ class OurSimpleHTTPRequestHandler(SimpleHTTPRequestHandler):
                 logLevel = logging.WARNING
                 post_msg = f"graph for operationName: {option_name} we don't know how to handle, but likely could add support, returning empty instead. If you get an error this may be why (include this message in bug report)."
                 self.wfile.write(bytes('{"data": "empty"}', "utf-8"))
+        else:
+            # Falling through without writing anything closes the connection with no
+            # response at all, which surfaces in the client as a network failure and
+            # aborts showcase startup. A well formed empty result lets it carry on.
+            self.send_response(200)
+            self.end_headers()
+            logLevel = logging.WARNING
+            post_msg = f"graph for operationName: {option_name} is not one we capture, returning an empty result rather than no response (include this message in a bug report)."
+            self.wfile.write(bytes('{"data": {}}', "utf-8"))
 
         if post_msg is not None:
             consoleDebugLog(f"Handling a graph request on {self.path}: {post_msg}", loglevel=logLevel)
@@ -1469,6 +1478,8 @@ GRAPH_DATA_REQ = {
     "GetRoomClassifications": "?operationName=GetRoomClassifications&variables=%7B%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22fdfefe83b3f6c491b0b76576b34366278274c92b36324bef4dd299d39fb986f3%22%7D%7D",  # yes get room classificaitons does not take a model id
     "GetRooms": "?operationName=GetRooms&variables=%7B%22modelId%22%3A%22[MATTERPORT_MODEL_ID]%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%223743bbb80ad617297c8e8c943499144b8ff20840a5c1fd48e5d3d131d915ed3a%22%7D%7D",
     "GetFloors": "?operationName=GetFloors&variables=%7B%22modelId%22%3A%22[MATTERPORT_MODEL_ID]%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%225df6b8c235ad84bba1032135922354e8850320ce8780315993722778d9835f15%22%7D%7D",
+    "GetModelPolicies": "?operationName=GetModelPolicies&variables=%7B%22modelId%22%3A%22[MATTERPORT_MODEL_ID]%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%2288d90cc2d716f5f3775082bb84ff589221d9e323f0837d1c7c41575b4c084494%22%7D%7D",  # showcase refuses to start without this one
+    "GetViews": "?operationName=GetViews&variables=%7B%22modelId%22%3A%22[MATTERPORT_MODEL_ID]%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%226cce0bba2ff4ead85e8be28528cc3951ab7231761d04452e2c8f2b4ef5782020%22%7D%7D",  # showcase also refuses to start without this one
     "GetModelOptions": "?operationName=GetModelOptions&variables=%7B%22modelId%22%3A%22[MATTERPORT_MODEL_ID]%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%2248765f4d53c1700521382c03034c1b67e63b9bdc6cccdc6c4e853620cd9c74c7%22%7D%7D",
 }
 OUR_SESSION: requests.AsyncSession
